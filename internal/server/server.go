@@ -2,6 +2,7 @@ package server
 
 import (
 	"encoding/json"
+	"io"
 	"log"
 	"net/http"
 
@@ -93,5 +94,7 @@ func writeError(w http.ResponseWriter, status int, msg string) {
 
 func decodeJSON(r *http.Request, v any) error {
 	defer r.Body.Close()
-	return json.NewDecoder(r.Body).Decode(v)
+	// Limit request body to 64KB for JSON endpoints
+	limited := io.LimitReader(r.Body, 64*1024)
+	return json.NewDecoder(limited).Decode(v)
 }

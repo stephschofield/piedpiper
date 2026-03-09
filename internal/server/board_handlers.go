@@ -2,11 +2,14 @@ package server
 
 import (
 	"net/http"
+	"regexp"
 	"strconv"
 
 	"agenthub/internal/auth"
 	"agenthub/internal/db"
 )
+
+var channelNameRe = regexp.MustCompile(`^[a-z0-9][a-z0-9_-]{0,30}$`)
 
 func (s *Server) handleListChannels(w http.ResponseWriter, r *http.Request) {
 	channels, err := s.db.ListChannels()
@@ -29,8 +32,15 @@ func (s *Server) handleCreateChannel(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "invalid json")
 		return
 	}
-	if req.Name == "" {
-		writeError(w, http.StatusBadRequest, "name is required")
+	if !channelNameRe.MatchString(req.Name) {
+		writeError(w, http.StatusBadRequest, "channel name must be 1-31 lowercase alphanumeric/dash/underscore chars")
+		return
+	}
+
+	// Cap total channels at 100
+	channels, _ := s.db.ListChannels()
+	if len(channels) >= 100 {
+		writeError(w, http.StatusForbidden, "channel limit reached")
 		return
 	}
 
@@ -111,6 +121,10 @@ func (s *Server) handleCreatePost(w http.ResponseWriter, r *http.Request) {
 	}
 	if req.Content == "" {
 		writeError(w, http.StatusBadRequest, "content is required")
+		return
+	}
+	if len(req.Content) > 32*1024 {
+		writeError(w, http.StatusBadRequest, "post content too large (max 32KB)")
 		return
 	}
 

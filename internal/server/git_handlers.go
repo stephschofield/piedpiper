@@ -208,6 +208,14 @@ func (s *Server) handleGetLeaves(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleDiff(w http.ResponseWriter, r *http.Request) {
+	agent := auth.AgentFromContext(r.Context())
+	// Rate limit diffs (CPU-expensive)
+	allowed, _ := s.db.CheckRateLimit(agent.ID, "diff", 60)
+	if !allowed {
+		writeError(w, http.StatusTooManyRequests, "diff rate limit exceeded")
+		return
+	}
+
 	hashA := r.PathValue("hash_a")
 	hashB := r.PathValue("hash_b")
 	if !gitrepo.IsValidHash(hashA) || !gitrepo.IsValidHash(hashB) {
@@ -221,6 +229,7 @@ func (s *Server) handleDiff(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	s.db.IncrementRateLimit(agent.ID, "diff")
 	w.Header().Set("Content-Type", "text/plain")
 	w.Write([]byte(diff))
 }

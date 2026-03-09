@@ -5,5 +5,8 @@
 # Data directory
 data/
 
+# Secrets
+.env
+
 # OS
 .DS_Store
